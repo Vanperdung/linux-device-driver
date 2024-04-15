@@ -2,3 +2,13 @@
 books/
 examples_github/
 my_notes/
+output/
+*.cmd
+*.mod
+*.mod.c
+*.mod.o
+*.o
+*.a
+*.so
+*.symvers
+*.order
