@@ -1,0 +1,23 @@
+wait_event(wq, condition) TASK_UNINTERRUPTIBLE
+	=> process is put to sleep until condition=true
+	condition is checked each time the waitqueue wq is woken up
+	
+wait_event_timeout(wq, condition, timeout) TASK_UNINTERRUPTIBLE
+	=> sleep until a condition=true or timeout elapses
+	return 0 if condition=false (timeout)
+	return 1 if condition=true
+	
+wait_event_cmd(wq, condition, cmd1, cmd2) TASK_UNINTERRUPTIBLE
+	=> same as wait_event. But process will execute cmd1 before sleep and will execute cmd2 after sleep.
+	
+wait_event_interruptible(wq, condition) TASK_INTERRUPTIBLE
+	=> put process to sleep untl condition=true or a signal is received.
+	return -ERESTARTSYS if it was interrupted by a signal and 0 if condition=true
+
+wait_event_interruptible_timeout
+
+wait_event_killable
+
+
+wake_up(&wq)
+	=> wakes up only one process from wait queue which is in non-

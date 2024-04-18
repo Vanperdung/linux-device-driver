@@ -12,4 +12,3 @@ output/
 *.so
 *.symvers
 *.order
-*.txt
