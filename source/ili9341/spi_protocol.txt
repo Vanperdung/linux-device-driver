@@ -1,0 +1,91 @@
+struct spi_device {
+    struct device dev;
+    struct spi_controller * controller;
+    struct spi_controller * master;
+    u32 max_speed_hz;
+    u8 chip_select;
+    u8 bits_per_word;
+    u16 mode;
+    int irq;
+    void * controller_state;
+    void * controller_data;
+    char modalias;
+    int cs_gpio;
+    struct spi_statistics statistics;
+    }
+
+#define SPI_CPHA 0x01 /* clock phase */
+#define SPI_CPOL 0x02 /* clock polarity */
+#define SPI_MODE_0 (0|0) /* (original MicroWire) */
+#define SPI_MODE_1 (0|SPI_CPHA)
+#define SPI_MODE_2 (SPI_CPOL|0)
+#define SPI_MODE_3 (SPI_CPOL|SPI_CPHA)
+#define SPI_CS_HIGH 0x04 /* chipselect active high? */
+#define SPI_LSB_FIRST 0x08 /* per-word bits-on-wire */
+#define SPI_3WIRE 0x10 /* SI/SO signals shared */
+#define SPI_LOOP 0x20 /* loopback mode */
+#define SPI_NO_CS 0x40 /* 1 dev/bus, no chipselect */
+#define SPI_READY 0x80 /* slave pulls low to pause */
+#define SPI_TX_DUAL 0x100 /* transmit with 2 wires */
+#define SPI_TX_QUAD 0x200 /* transmit with 4 wires */
+#define SPI_RX_DUAL 0x400 /* receive with 2 wires */
+#define SPI_RX_QUAD 0x800 /* receive with 4 wires */
+
+static int myspi_probe(struct spi_device *spi)
+{
+    struct myspi *chip;
+    struct myspi_platform_data *pdata, local_pdata;
+    match = of_match_device(of_match_ptr(myspi_of_match), &spi->dev);
+    if (match) {
+        /* parse device tree options */
+        pdata = &local_pdata;
+        chip = devm_kzalloc(&spi->dev, sizeof *chip, GFP_KERNEL);
+        if (!chip)
+            return -ENOMEM;
+        spi_set_drvdata(spi, chip);
+        ...
+    }
+    else {
+        /* use platform data */
+        pdata = &spi->dev.platform_data;
+        if (!pdata)
+            return -ENODEV;
+    }
+}
+
+of_match_device Used by a driver to check whether an platform_device present in the 
+system is in its list of supported devices. => return of_device_id node.
+
+static const struct of_device_id myspi_of_match[] = {
+{
+    .compatible = "mycompany,myspi",
+    .data = (void *) MYSPI_DATA,
+    },
+    { },
+};
+MODULE_DEVICE_TABLE(of, myspi_of_match);
+
+static const struct spi_device_id myspi_id_table[] = {
+    { "myspi", MYSPI_TYPE },
+    { },
+};
+MODULE_DEVICE_TABLE(spi, myspi_id_table);
+
+struct spi_driver {
+    const struct spi_device_id * id_table;
+    int (* probe) (struct spi_device *spi);
+    int (* remove) (struct spi_device *spi);
+    void (* shutdown) (struct spi_device *spi);
+    struct device_driver driver;
+};
+
+static struct spi_driver myspi_driver = {
+    .driver = {
+    .name = "myspi_spi",
+    .pm = &myspi_pm_ops,
+    .of_match_table = of_match_ptr(myspi_of_match),
+    },
+    .probe = myspi_probe,
+    .id_table = myspi_id_table,
+};
+module_spi_driver(myspi_driver);
