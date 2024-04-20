@@ -1,0 +1,10 @@
+Input subsystem:
+    - is a collection of drivers.
+    - is designed to support all input device under Linux.
+
+The core of input subsystem is the input module, which must be loaded before
+any other of the input modules - it serves as a way of communication between
+two groups modules:
+    1. Device drivers: is middleware between app and hardware, provides event to input modules.
+    2. Event handlers: get events from input core and pass them where needed via various interfaces.
+
