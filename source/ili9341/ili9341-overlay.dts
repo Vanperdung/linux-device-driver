@@ -1,0 +1,38 @@
+/dts-v1/;
+/plugin/;
+
+/ {
+    compatible = "brcm,bcm2711";
+
+    fragment@0 {
+        target = <&spi6_cs_pins>;
+        __overlay__ {
+            brcm,pins = <18>;
+            brcm,function = <1>;
+        };
+    };
+
+    fragment@1 {
+        target = <&spi6>;
+        __overlay__ {
+            status = "okay";
+            #address-cells = <1>;
+            #size-cells = <0>;
+            cs-gpios = <&gpio 18 0>;
+
+            custom_ili9341@0 {
+                compatible = "nvd, custom_ili9341";
+                reg = <0>;
+                #address-cells = <1>;
+		        #size-cells = <0>;
+                spi-max-frequency = <32000000>;
+                rotate = <0>;  // Rotation: 0, 90, 180, 270
+                bgr = <1>;  // Use BGR mode
+                fps = <60>;  // Frames per second
+                dc-gpios = <&gpio 24 0>;  // Data/command pin (GPIO 24)
+                reset-gpios = <&gpio 25 0>;  // Reset pin (GPIO 25)
+                led-gpios = <&gpio 26 0>;  // Backlight pin (GPIO 26)
+            };
+        };
+    };
+};
