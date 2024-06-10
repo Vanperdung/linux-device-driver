@@ -29,9 +29,9 @@
                 rotate = <0>;  // Rotation: 0, 90, 180, 270
                 bgr = <1>;  // Use BGR mode
                 fps = <60>;  // Frames per second
-                dc-gpios = <&gpio 24 0>;  // Data/command pin (GPIO 24)
-                reset-gpios = <&gpio 25 0>;  // Reset pin (GPIO 25)
-                led-gpios = <&gpio 26 0>;  // Backlight pin (GPIO 26)
+                dc-gpios = <&gpio 24 0>;  // Data/command pin (GPIO 24) active high
+                reset-gpios = <&gpio 25 0>;  // Reset pin (GPIO 25) active high
+                led-gpios = <&gpio 26 0>;  // Backlight pin (GPIO 26) active high
             };
         };
     };
