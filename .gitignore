@@ -12,3 +12,4 @@ output/
 *.so
 *.symvers
 *.order
+fbcp-ili9341/

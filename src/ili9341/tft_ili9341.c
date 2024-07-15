@@ -1,35 +1,5 @@
-#include <linux/module.h>
-#include <linux/spi/spi.h>
-#include <linux/gpio/consumer.h>
-#include <linux/of.h>
-#include <linux/of_device.h>
-#include <linux/delay.h>
-#include <linux/fs.h>
-#include <linux/uaccess.h>
-#include <linux/ioctl.h>
-#include <linux/cdev.h>
-
-#define LCD_MAGIC 'i'
-#define LCD_WRITE_CMD _IOW(LCD_MAGIC, 0, struct lcd_packet *)
-#define LCD_WRITE_DATA _IOW(LCD_MAGIC, 1, struct lcd_packet *)
-
-struct ili9341_data
-{
-    struct spi_device *spi;
-    struct spi_device *spi_dev;
-    struct gpio_desc *dc;
-    struct gpio_desc *reset;
-    struct gpio_desc *led;
-    dev_t spi_dev_num;
-    struct cdev spi_cdev;
-    struct class *spi_class;
-};
-
-struct lcd_packet
-{
-    char __user *data;
-    int len;
-};
+#include "tft_ili9341.h"
+#include "lcd.h"
 
 const struct spi_device_id ili9341_id[] = 
 {
@@ -76,15 +46,7 @@ struct file_operations ili9341_fops =
     .release = lcd_close,
 };
 
-void lcd_reset(struct ili9341_data *ili9341)
-{
-    gpiod_set_value(ili9341->reset, 0);
-    msleep(20);
-    gpiod_set_value(ili9341->reset, 1);
-    msleep(200);
-}
-
-int lcd_write_cmd(struct ili9341_data *ili9341, uint8_t *cmd, int len)
+int spi_write_cmd(struct ili9341_data *ili9341, uint8_t *cmd, int len)
 {
     struct spi_transfer trans = 
     {
@@ -97,10 +59,28 @@ int lcd_write_cmd(struct ili9341_data *ili9341, uint8_t *cmd, int len)
     spi_message_add_tail(&trans, &mess);
 
     gpiod_set_value(ili9341->dc, 0);
-    return spi_async(ili9341->spi, &mess);
+
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s: Sending %d bytes\n", __func__, len);
+    
+    for (int i = 0; i < len; i++)
+    {
+        printk("    [%d] = 0x%02x\n", (unsigned int)(cmd[i]));
+    }
+
+    int ret = spi_sync(ili9341->spi, &mess);
+    if (ret < 0)
+    {
+        printk("SPI sync failed, status = %d\n", ret);
+    }
+
+    return ret;
+#elif
+    return spi_sync(ili9341->spi, &mess);
+#endif
 }
 
-int lcd_write_data(struct ili9341_data *ili9341, uint8_t *data, int len)
+int spi_write_data(struct ili9341_data *ili9341, uint8_t *data, int len)
 {
     struct spi_transfer trans = 
     {
@@ -113,49 +93,97 @@ int lcd_write_data(struct ili9341_data *ili9341, uint8_t *data, int len)
     spi_message_add_tail(&trans, &mess);
 
     gpiod_set_value(ili9341->dc, 1);
-    int ret = spi_async(ili9341->spi, &mess);
-    gpiod_set_value(ili9341->dc, 0);
 
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s: Sending %d bytes\n", __func__, len);
+    
+    for (int i = 0; i < len; i++)
+    {
+        printk("    [%d] = 0x%02x\n", (unsigned int)(data[i]));
+    }
+
+    int ret = spi_sync(ili9341->spi, &mess);
+    if (ret < 0)
+    {
+        printk("SPI sync failed, status = %d\n", ret);
+    }
+#elif
+    int ret = spi_sync(ili9341->spi, &mess);
+    gpiod_set_value(ili9341->dc, 0);
+#endif
     return ret;
 }
 
-void lcd_read_data(struct ili9341_data *ili9341, uint8_t *data)
+void spi_read_data(struct ili9341_data *ili9341, uint8_t *data, int len)
 {
     return;
 }
 
 int lcd_open(struct inode *inode, struct file *file)
 {
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s\n", __func__);
+#endif
+
+    struct ili9341_data *ili9341 = container_of(inode->i_cdev, struct ili9341_data, lcd_cdev);
+    if (!ili9341)
+    {
+        printk("%s: Cant get private data\n", __func__);
+        return -ENODEV;
+    }
+
+    file->private_data = ili9341;
+
     return 0;
 }
 
 int lcd_close(struct inode *inode, struct file *file)
 {
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s\n", __func__);
+#endif
+
     return 0;
 }
 
 ssize_t lcd_read(struct file *file, char __user * buff, size_t len, loff_t *offset)
 {
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s\n", __func__);
+#endif
     return 0;
 }
 
 ssize_t lcd_write(struct file *file, const char __user *buff, size_t len, loff_t *offset)
 {
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s\n", __func__);
+#endif
     return 0;
 }
 
 long lcd_ioctl(struct file *file, unsigned int cmd, unsigned long arg)
 {
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s\n", __func__);
+#endif
+
+    struct ili9341_data *ili9341 = file->private_data;
+
     switch (cmd)
     {
         case LCD_WRITE_CMD:
-            
+            printk("%s:LCD_WRITE_CMD\n", __func__);
             break;
         
         case LCD_WRITE_DATA:
-            
+            printk("%s:LCD_WRITE_CMD\n", __func__);
             break;
 
+        case LCD_RESET:
+            printk("%s:LCD_RESET\n", __func__);
+            lcd_reset(ili9341);
+            break;
         default:
             break;
     }
@@ -168,7 +196,9 @@ int	ili9341_probe(struct spi_device *spi)
     struct ili9341_data *ili9341;
     int ret;
 
-    printk("(%s):%d is called\r\n", __func__, __LINE__);
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s\n", __func__);
+#endif
 
     ili9341 = devm_kzalloc(dev, sizeof(struct ili9341_data), GFP_KERNEL);
     if (!ili9341)
@@ -204,43 +234,41 @@ int	ili9341_probe(struct spi_device *spi)
         ret = PTR_ERR(ili9341->dc);
         return ret;
     }
-    
-    // LCD initialization
-    lcd_reset(ili9341);
 
-    ret = alloc_chrdev_region(&ili9341->spi_dev_num, 0, 1, "ili9341");
+    ret = alloc_chrdev_region(&ili9341->lcd_dev_num, 0, 1, "ili9341");
     if (ret < 0)
     {
         dev_err(dev, "Failed to allocate chrdev region\r\n");
         return ret;
     }
 
-    cdev_init(&ili9341->spi_cdev, &ili9341_fops);
+    cdev_init(&ili9341->lcd_cdev, &ili9341_fops);
 
-    ret = cdev_add(&ili9341->spi_cdev, ili9341->spi_dev_num, 1);
+    ret = cdev_add(&ili9341->lcd_cdev, ili9341->lcd_dev_num, 1);
     if (ret < 0)
     {
         dev_err(dev, "Failed to add cdev\r\n");
-        unregister_chrdev_region(ili9341->spi_dev_num, 1);
+        unregister_chrdev_region(ili9341->lcd_dev_num, 1);
         return ret;
     }
 
-    ili9341->spi_class = class_create("ili9341_spi");
-    if (IS_ERR(ili9341->spi_class))
+    ili9341->lcd_class = class_create("ili9341_spi");
+    if (IS_ERR(ili9341->lcd_class))
     {
-        ret = PTR_ERR(ili9341->spi_class);
+        ret = PTR_ERR(ili9341->lcd_class);
         dev_err(dev, "Failed to create class\r\n");
-        cdev_del(&ili9341->spi_cdev);
-        unregister_chrdev_region(ili9341->spi_dev_num, 1);
+        cdev_del(&ili9341->lcd_cdev);
+        unregister_chrdev_region(ili9341->lcd_dev_num, 1);
         return ret;
     }
 
-    if (IS_ERR(device_create(ili9341->spi_class, NULL, ili9341->spi_dev_num, NULL, "ili9341_spi_dev")))
+    ili9341->lcd_dev = device_create(ili9341->lcd_class, NULL, ili9341->lcd_dev_num, NULL, "ili9341");
+    if (IS_ERR(ili9341->lcd_dev))
     {
         dev_err(dev, "Failed to create device\r\n");
-        class_destroy(ili9341->spi_class);
-        cdev_del(&ili9341->spi_cdev);
-        unregister_chrdev_region(ili9341->spi_dev_num, 1);        
+        class_destroy(ili9341->lcd_class);
+        cdev_del(&ili9341->lcd_cdev);
+        unregister_chrdev_region(ili9341->lcd_dev_num, 1);        
         return -ENOMEM;
     }
 
@@ -249,7 +277,9 @@ int	ili9341_probe(struct spi_device *spi)
 
 void ili9341_remove(struct spi_device *spi)
 {
-    printk("(%s):%d is called\r\n", __func__, __LINE__);
+#ifndef LCD_DISABLE_DEBUG    
+    printk("%s\n", __func__);
+#endif
 }
 
 module_spi_driver(ili9341_driver);

@@ -1,5 +1,5 @@
-OUTPUT_NAME = custom_ili9341
-BUILD_DIR = /home/dung/workdir/linux-kernel-pi
+OUTPUT_NAME = ili9341
+BUILD_DIR = /home/dung/workdir/linux
 OUTPUT_DIR = ../output
 ARCH = arm64
 CROSS_COMPILE = aarch64-linux-gnu-
@@ -8,7 +8,8 @@ HOSTNAME = vanperdung
 IP = 192.168.1.10
 INSTALL_DIR = ~/workdir/modules/.
 
-obj-m += custom_ili9341.o
+obj-m += $(OUTPUT_NAME).o
+$(OUTPUT_NAME)-objs := lcd.o tft_ili9341.o
 
 all: modules 
 
